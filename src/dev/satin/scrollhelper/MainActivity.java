@@ -4,6 +4,8 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -26,10 +28,14 @@ public class MainActivity extends Activity {
     public static final String KEY_ENABLE_DRAG = "enable_drag_scrub";
     public static final String KEY_ENABLE_TOP_TAP = "enable_top_tap";
     public static final String KEY_HIDE_IN_BANKS = "hide_in_banks";
+    public static final String KEY_ONLY_MISSING_SCROLLBAR = "only_missing_scrollbar";
+    public static final String KEY_LAST_FOREGROUND_PKG = "last_foreground_pkg";
+    public static final String KEY_EXCLUDED_PKGS = "excluded_pkgs";
     public static final String KEY_THEME_MODE = "theme_mode"; // 0 = auto, 1 = dark, 2 = light
 
     private TextView overlayValueView;
     private TextView a11yValueView;
+    private LinearLayout recentAppContainer;
 
     private int bgColor;
     private int surfaceColor;
@@ -185,11 +191,17 @@ public class MainActivity extends Activity {
 
         optsGroup.addView(buildSwitchRow(d, prefs, KEY_ENABLE_SCROLLBAR, true, "Right-edge scrollbar"));
         optsGroup.addView(buildDivider(d));
+        optsGroup.addView(buildSwitchRow(d, prefs, KEY_ONLY_MISSING_SCROLLBAR, true, "Skip views with native scrollbar"));
+        optsGroup.addView(buildDivider(d));
         optsGroup.addView(buildSwitchRow(d, prefs, KEY_ENABLE_DRAG, true, "Hold and drag scrollbar"));
         optsGroup.addView(buildDivider(d));
         optsGroup.addView(buildSwitchRow(d, prefs, KEY_ENABLE_TOP_TAP, true, "Tap status bar to scroll top"));
         optsGroup.addView(buildDivider(d));
         optsGroup.addView(buildSwitchRow(d, prefs, KEY_HIDE_IN_BANKS, true, "Pause in banking apps"));
+
+        recentAppContainer = new LinearLayout(this);
+        recentAppContainer.setOrientation(LinearLayout.VERTICAL);
+        optsGroup.addView(recentAppContainer);
 
         root.addView(optsGroup);
 
@@ -206,6 +218,75 @@ public class MainActivity extends Activity {
 
         setContentView(scrollView);
         refreshPermissionLabels();
+        refreshRecentAppRow();
+    }
+
+    private void refreshRecentAppRow() {
+        if (recentAppContainer == null) return;
+        recentAppContainer.removeAllViews();
+
+        final SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        final String lastPkg = prefs.getString(KEY_LAST_FOREGROUND_PKG, "");
+        if (lastPkg == null || lastPkg.isEmpty() || lastPkg.equals(getPackageName())) {
+            return;
+        }
+
+        String appLabel = lastPkg;
+        try {
+            PackageManager pm = getPackageManager();
+            ApplicationInfo ai = pm.getApplicationInfo(lastPkg, 0);
+            CharSequence label = pm.getApplicationLabel(ai);
+            if (label != null && label.length() > 0) {
+                appLabel = label.toString();
+            }
+        } catch (Exception ignored) {
+        }
+
+        final float d = getResources().getDisplayMetrics().density;
+        recentAppContainer.addView(buildDivider(d));
+
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        int hPad = (int) (16 * d);
+        int vPad = (int) (11 * d);
+        row.setPadding(hPad, vPad, hPad, vPad);
+
+        TextView left = new TextView(this);
+        left.setText("Show scrollbar in " + appLabel);
+        left.setTextColor(textPrimary);
+        left.setTextSize(15f);
+        LinearLayout.LayoutParams leftLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        row.addView(left, leftLp);
+
+        final String excludedCsv = prefs.getString(KEY_EXCLUDED_PKGS, "");
+        boolean isExcluded = ("," + excludedCsv + ",").contains("," + lastPkg + ",");
+
+        Switch sw = new Switch(this);
+        sw.setChecked(!isExcluded);
+        sw.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean showInApp) {
+                String currentCsv = prefs.getString(KEY_EXCLUDED_PKGS, "");
+                String[] parts = currentCsv.split(",");
+                StringBuilder sb = new StringBuilder();
+                for (String p : parts) {
+                    String trimmed = p.trim();
+                    if (!trimmed.isEmpty() && !trimmed.equals(lastPkg)) {
+                        if (sb.length() > 0) sb.append(",");
+                        sb.append(trimmed);
+                    }
+                }
+                if (!showInApp) {
+                    if (sb.length() > 0) sb.append(",");
+                    sb.append(lastPkg);
+                }
+                prefs.edit().putString(KEY_EXCLUDED_PKGS, sb.toString()).apply();
+            }
+        });
+        row.addView(sw);
+
+        recentAppContainer.addView(row);
     }
 
     private View buildThemeSwitcher(float d, final SharedPreferences prefs) {
@@ -395,5 +476,6 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         refreshPermissionLabels();
+        refreshRecentAppRow();
     }
 }

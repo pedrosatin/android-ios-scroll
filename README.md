@@ -1,6 +1,6 @@
 # Scroll Helper
 
-iOS-style right-edge scrollbar and status-bar tap-to-scroll-to-top for Android 10+ (`minSdkVersion 29`, `~25 KB`, zero dependencies).
+iOS-style right-edge scrollbar and status-bar tap-to-scroll-to-top for Android 10+ (`minSdkVersion 29`, `~26 KB`, zero dependencies).
 
 Works on any Android phone (Samsung One UI, Pixel, Xiaomi, Motorola, Nothing). Tested at 120Hz on a Galaxy S25 running Android 17 / One UI 9.
 
@@ -9,6 +9,7 @@ Works on any Android phone (Samsung One UI, Pixel, Xiaomi, Motorola, Nothing). T
 ## Features
 
 - Renders a 120Hz right-edge scrollbar in apps that hide the native indicator, including X (Twitter) and Jetpack Compose feeds.
+- Skips `WebView`, standard `ScrollView`, and browsers that already draw their own scrollbar, plus provides a 1-tap toggle to disable the scrollbar for the most recently used app.
 - Expands the scrollbar pill on long-press with haptic feedback so you can drag it vertically to scrub through long lists.
 - Scrolls back to the top of any feed or browser when you tap the center of the status bar (camera cutout), while keeping swipe-down for notifications.
 - Supports Auto, Dark, and Light themes and pauses automatically inside banking apps.

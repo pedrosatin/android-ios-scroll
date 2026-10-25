@@ -72,6 +72,7 @@ public class ScrollAccessibilityService extends AccessibilityService implements 
 
     private static final Set<String> IGNORED_PACKAGES = new HashSet<>();
     private static final Set<String> SENSITIVE_PACKAGES = new HashSet<>();
+    private static final Set<String> NATIVE_SCROLLBAR_PACKAGES = new HashSet<>();
     static {
         IGNORED_PACKAGES.add("com.sec.android.app.launcher");
         IGNORED_PACKAGES.add("com.android.systemui");
@@ -85,6 +86,14 @@ public class ScrollAccessibilityService extends AccessibilityService implements 
         SENSITIVE_PACKAGES.add("com.nomadglobal.app");
         SENSITIVE_PACKAGES.add("br.com.avenue.mobile");
         SENSITIVE_PACKAGES.add("com.binance.dev");
+
+        // Apps and browsers that already render their own right-edge scrollbar
+        NATIVE_SCROLLBAR_PACKAGES.add("com.t3tools.t3code");
+        NATIVE_SCROLLBAR_PACKAGES.add("com.brave.browser");
+        NATIVE_SCROLLBAR_PACKAGES.add("com.android.chrome");
+        NATIVE_SCROLLBAR_PACKAGES.add("com.sec.android.app.sbrowser");
+        NATIVE_SCROLLBAR_PACKAGES.add("org.mozilla.firefox");
+        NATIVE_SCROLLBAR_PACKAGES.add("com.android.settings");
     }
 
     private final Runnable beginFadeOutRunnable = new Runnable() {
@@ -125,6 +134,10 @@ public class ScrollAccessibilityService extends AccessibilityService implements 
         return prefs == null || prefs.getBoolean(MainActivity.KEY_ENABLE_SCROLLBAR, true);
     }
 
+    private boolean shouldSkipNativeScrollbars() {
+        return prefs == null || prefs.getBoolean(MainActivity.KEY_ONLY_MISSING_SCROLLBAR, true);
+    }
+
     private boolean isDragEnabled() {
         return prefs == null || prefs.getBoolean(MainActivity.KEY_ENABLE_DRAG, true);
     }
@@ -135,6 +148,12 @@ public class ScrollAccessibilityService extends AccessibilityService implements 
 
     private boolean shouldHideInBanks() {
         return prefs == null || prefs.getBoolean(MainActivity.KEY_HIDE_IN_BANKS, true);
+    }
+
+    private boolean isUserExcludedPackage(String pkg) {
+        if (prefs == null || pkg == null || pkg.isEmpty()) return false;
+        String csv = prefs.getString(MainActivity.KEY_EXCLUDED_PKGS, "");
+        return !csv.isEmpty() && ("," + csv + ",").contains("," + pkg + ",");
     }
 
     private boolean isDarkThemeActive() {
@@ -417,6 +436,13 @@ public class ScrollAccessibilityService extends AccessibilityService implements 
         }
     }
 
+    private void hideScrollbarImmediate() {
+        targetAlpha = 0f;
+        displayedAlpha = 0f;
+        setBarTouchable(false);
+        if (scrollBarView != null) scrollBarView.invalidate();
+    }
+
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
         if (event == null) return;
@@ -428,17 +454,20 @@ public class ScrollAccessibilityService extends AccessibilityService implements 
         CharSequence pkgCs = event.getPackageName();
         String pkg = pkgCs != null ? pkgCs.toString() : "";
 
+        boolean isSelfApp = pkg.equals(getPackageName());
         boolean blockedPkg = IGNORED_PACKAGES.contains(pkg)
-                || (shouldHideInBanks() && SENSITIVE_PACKAGES.contains(pkg));
+                || (shouldHideInBanks() && SENSITIVE_PACKAGES.contains(pkg))
+                || isUserExcludedPackage(pkg)
+                || (!isSelfApp && shouldSkipNativeScrollbars() && NATIVE_SCROLLBAR_PACKAGES.contains(pkg));
 
         if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             if (!pkg.isEmpty() && !pkg.equals(currentPackage)) {
                 currentPackage = pkg;
+                if (!isSelfApp && !IGNORED_PACKAGES.contains(pkg) && !SENSITIVE_PACKAGES.contains(pkg) && prefs != null) {
+                    prefs.edit().putString(MainActivity.KEY_LAST_FOREGROUND_PKG, pkg).apply();
+                }
                 if (blockedPkg) {
-                    targetAlpha = 0f;
-                    displayedAlpha = 0f;
-                    setBarTouchable(false);
-                    if (scrollBarView != null) scrollBarView.invalidate();
+                    hideScrollbarImmediate();
                 }
             }
             return;
@@ -453,6 +482,13 @@ public class ScrollAccessibilityService extends AccessibilityService implements 
         String cls = clsCs != null ? clsCs.toString() : "";
         if (cls.contains("ViewPager") || cls.contains("HorizontalScrollView") || cls.contains("TabLayout")) {
             return;
+        }
+
+        // WebViews and standard ScrollViews in third-party apps already draw their own native scrollbar
+        if (!isSelfApp && shouldSkipNativeScrollbars()) {
+            if (cls.contains("WebView") || cls.contains("ScrollView")) {
+                return;
+            }
         }
 
         int dx = event.getScrollDeltaX();
@@ -485,6 +521,12 @@ public class ScrollAccessibilityService extends AccessibilityService implements 
         if (maxScrollY > 0 && scrollY >= 0) {
             int gap = maxScrollY - scrollY;
             boolean isComposeSyntheticMax = (gap >= 50 && gap <= 250 && fromIndex < 0 && itemCount < 0);
+
+            // Standard pixel-scrolled containers with a real maxScrollY (not Compose synthetic max)
+            // in third-party apps already render their own scrollbar
+            if (!isSelfApp && shouldSkipNativeScrollbars() && !isComposeSyntheticMax) {
+                return;
+            }
 
             if (isComposeSyntheticMax && tracker.lastScrollY > dm.heightPixels * 1.2f && scrollY < dm.heightPixels * 0.45f) {
                 if (tracker.lastScrollY - scrollY > dm.heightPixels * 0.9f) {
@@ -594,7 +636,13 @@ public class ScrollAccessibilityService extends AccessibilityService implements 
             tracker.lastScrollY = 0;
         }
         targetFraction = 0f;
-        if (isScrollbarEnabled()) {
+        boolean isSelfApp = currentPackage.equals(getPackageName());
+        boolean blockedScrollbar = IGNORED_PACKAGES.contains(currentPackage)
+                || (shouldHideInBanks() && SENSITIVE_PACKAGES.contains(currentPackage))
+                || isUserExcludedPackage(currentPackage)
+                || (!isSelfApp && shouldSkipNativeScrollbars() && NATIVE_SCROLLBAR_PACKAGES.contains(currentPackage));
+
+        if (isScrollbarEnabled() && !blockedScrollbar) {
             targetAlpha = 1.0f;
             setBarTouchable(isDragEnabled());
             handler.removeCallbacks(beginFadeOutRunnable);
