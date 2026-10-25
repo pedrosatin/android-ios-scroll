@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.res.Configuration;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -136,6 +137,16 @@ public class ScrollAccessibilityService extends AccessibilityService implements 
         return prefs == null || prefs.getBoolean(MainActivity.KEY_HIDE_IN_BANKS, true);
     }
 
+    private boolean isDarkThemeActive() {
+        if (prefs != null) {
+            int mode = prefs.getInt(MainActivity.KEY_THEME_MODE, 0);
+            if (mode == 1) return true;
+            if (mode == 2) return false;
+        }
+        int uiMode = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
+        return uiMode == Configuration.UI_MODE_NIGHT_YES;
+    }
+
     private void setBarTouchable(boolean touchable) {
         if (wm == null || scrollBarView == null || barParams == null || !overlaysAdded) return;
         if (this.barTouchable == touchable) return;
@@ -158,6 +169,7 @@ public class ScrollAccessibilityService extends AccessibilityService implements 
         setupOverlays();
     }
 
+    @SuppressWarnings("deprecation")
     private void setupOverlays() {
         DisplayMetrics dm = getResources().getDisplayMetrics();
         final float density = dm.density;
@@ -175,7 +187,8 @@ public class ScrollAccessibilityService extends AccessibilityService implements 
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                         | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
                         | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                        | WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED,
                 PixelFormat.TRANSLUCENT
         );
         barParams.gravity = Gravity.END | Gravity.CENTER_VERTICAL;
@@ -269,7 +282,8 @@ public class ScrollAccessibilityService extends AccessibilityService implements 
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                         | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
                         | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
-                        | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                        | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                        | WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED,
                 PixelFormat.TRANSLUCENT
         );
         topParams.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
@@ -655,8 +669,10 @@ public class ScrollAccessibilityService extends AccessibilityService implements 
             float top = 4 * density + (availH * clamp(displayedFraction, 0f, 1f));
             float bottom = top + thumbH;
 
-            int baseAlpha = isDragging ? 225 : 150;
-            thumbPaint.setColor(Color.argb((int) (displayedAlpha * baseAlpha), 195, 200, 210));
+            boolean dark = isDarkThemeActive();
+            int baseAlpha = isDragging ? 225 : (dark ? 155 : 140);
+            int channel = dark ? 205 : 75;
+            thumbPaint.setColor(Color.argb((int) (displayedAlpha * baseAlpha), channel, channel, channel));
             rect.set(left, top, right, bottom);
             canvas.drawRoundRect(rect, radius, radius, thumbPaint);
         }

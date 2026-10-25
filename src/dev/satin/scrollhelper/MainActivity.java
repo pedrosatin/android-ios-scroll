@@ -4,15 +4,16 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.View;
-import android.widget.Button;
 import android.widget.CompoundButton;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -25,100 +26,152 @@ public class MainActivity extends Activity {
     public static final String KEY_ENABLE_DRAG = "enable_drag_scrub";
     public static final String KEY_ENABLE_TOP_TAP = "enable_top_tap";
     public static final String KEY_HIDE_IN_BANKS = "hide_in_banks";
+    public static final String KEY_THEME_MODE = "theme_mode"; // 0 = system, 1 = dark, 2 = light
 
-    private TextView overlayStatusBadge;
-    private TextView a11yStatusBadge;
-    private TextView overallBanner;
+    private TextView overlayValueView;
+    private TextView a11yValueView;
+
+    private int bgColor;
+    private int surfaceColor;
+    private int borderColor;
+    private int textPrimary;
+    private int textSecondary;
+    private int pillBg;
+    private int pillSelectedBg;
+    private int pillSelectedText;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true);
+            setTurnScreenOn(true);
+        }
+        rebuildUi();
+    }
 
-        final float density = getResources().getDisplayMetrics().density;
-        int pad = (int) (20 * density);
+    private boolean resolveDarkMode(SharedPreferences prefs) {
+        int mode = prefs.getInt(KEY_THEME_MODE, 0);
+        if (mode == 1) return true;
+        if (mode == 2) return false;
+        int uiMode = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
+        return uiMode == Configuration.UI_MODE_NIGHT_YES;
+    }
+
+    private void applyPalette(boolean isDark) {
+        if (isDark) {
+            bgColor = Color.parseColor("#0A0A0A");
+            surfaceColor = Color.parseColor("#161616");
+            borderColor = Color.parseColor("#262626");
+            textPrimary = Color.parseColor("#EDEDED");
+            textSecondary = Color.parseColor("#8A8A8E");
+            pillBg = Color.parseColor("#222224");
+            pillSelectedBg = Color.parseColor("#EDEDED");
+            pillSelectedText = Color.parseColor("#0A0A0A");
+        } else {
+            bgColor = Color.parseColor("#F4F4F5");
+            surfaceColor = Color.parseColor("#FFFFFF");
+            borderColor = Color.parseColor("#E4E4E7");
+            textPrimary = Color.parseColor("#18181B");
+            textSecondary = Color.parseColor("#71717A");
+            pillBg = Color.parseColor("#F4F4F5");
+            pillSelectedBg = Color.parseColor("#18181B");
+            pillSelectedText = Color.parseColor("#FFFFFF");
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            getWindow().setStatusBarColor(bgColor);
+            getWindow().setNavigationBarColor(bgColor);
+            View decor = getWindow().getDecorView();
+            int flags = decor.getSystemUiVisibility();
+            if (isDark) {
+                flags &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            } else {
+                flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            }
+            decor.setSystemUiVisibility(flags);
+        }
+    }
+
+    private void rebuildUi() {
+        final SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        boolean isDark = resolveDarkMode(prefs);
+        applyPalette(isDark);
+
+        final float d = getResources().getDisplayMetrics().density;
+        int hPad = (int) (18 * d);
 
         ScrollView scrollView = new ScrollView(this);
-        scrollView.setBackgroundColor(Color.parseColor("#0B0D12"));
+        scrollView.setBackgroundColor(bgColor);
         scrollView.setFillViewport(true);
+        scrollView.setVerticalScrollBarEnabled(false);
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(pad, (int) (36 * density), pad, pad);
+        root.setPadding(hPad, (int) (42 * d), hPad, (int) (28 * d));
         scrollView.addView(root);
 
+        // Header row with title and theme selector
+        LinearLayout topBar = new LinearLayout(this);
+        topBar.setOrientation(LinearLayout.HORIZONTAL);
+        topBar.setGravity(Gravity.CENTER_VERTICAL);
+        topBar.setPadding(0, 0, 0, (int) (20 * d));
+
         TextView title = new TextView(this);
-        title.setText("iOS Scroll & Tap-to-Top");
-        title.setTextColor(Color.WHITE);
-        title.setTextSize(24f);
-        title.setTypeface(Typeface.DEFAULT_BOLD);
-        root.addView(title);
+        title.setText("Scroll Helper");
+        title.setTextColor(textPrimary);
+        title.setTextSize(22f);
+        title.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        topBar.addView(title, titleLp);
 
-        TextView subtitle = new TextView(this);
-        subtitle.setText("Barra de rolagem fluida de 120Hz com scrub interativo e toque no topo para voltar ao início no Android.");
-        subtitle.setTextColor(Color.parseColor("#94A3B8"));
-        subtitle.setTextSize(14f);
-        subtitle.setPadding(0, (int) (6 * density), 0, (int) (18 * density));
-        root.addView(subtitle);
+        topBar.addView(buildThemeSwitcher(d, prefs));
+        root.addView(topBar);
 
-        overallBanner = new TextView(this);
-        overallBanner.setTextSize(14f);
-        overallBanner.setTypeface(Typeface.DEFAULT_BOLD);
-        int bannerPad = (int) (14 * density);
-        overallBanner.setPadding(bannerPad, bannerPad, bannerPad, bannerPad);
-        LinearLayout.LayoutParams bannerLp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-        );
-        bannerLp.bottomMargin = (int) (16 * density);
-        root.addView(overallBanner, bannerLp);
+        // Section: Permissões
+        root.addView(buildSectionLabel(d, "PERMISSÕES"));
+        LinearLayout permGroup = createGroupCard(d);
 
-        // Card 1: Overlay Permission
-        overlayStatusBadge = new TextView(this);
-        root.addView(buildStepCard(
-                density,
-                "1. Permissão de sobreposição",
-                "Necessária para desenhar a pílula de rolagem na borda direita e a área de toque no topo da tela.",
-                overlayStatusBadge,
-                "Configurar sobreposição",
+        overlayValueView = new TextView(this);
+        permGroup.addView(buildActionRow(
+                d,
+                "Sobreposição de tela",
+                overlayValueView,
                 new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
-                        Intent intent = new Intent(
+                        startActivity(new Intent(
                                 Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                                 Uri.parse("package:" + getPackageName())
-                        );
-                        startActivity(intent);
+                        ));
                     }
                 }
         ));
+        permGroup.addView(buildDivider(d));
 
-        // Card 2: Restricted Settings helper (Android 13+)
-        root.addView(buildStepCard(
-                density,
-                "2. Desbloquear configurações restritas (Android 13+)",
-                "Se o Android bloquear a ativação na tela de Acessibilidade, abra as informações do app, toque no menu ⋮ no canto superior direito e selecione \"Permitir configurações restritas\".",
-                null,
-                "Abrir informações do app",
+        TextView restrictedValue = new TextView(this);
+        restrictedValue.setText("Info do app ›");
+        permGroup.addView(buildActionRow(
+                d,
+                "Configurações restritas",
+                restrictedValue,
                 new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
-                        Intent intent = new Intent(
+                        startActivity(new Intent(
                                 Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                                 Uri.parse("package:" + getPackageName())
-                        );
-                        startActivity(intent);
+                        ));
                     }
                 }
         ));
+        permGroup.addView(buildDivider(d));
 
-        // Card 3: Accessibility Service
-        a11yStatusBadge = new TextView(this);
-        root.addView(buildStepCard(
-                density,
-                "3. Serviço de acessibilidade",
-                "Ative \"S25 Scroll Helper\" em Configurações > Acessibilidade > Aplicativos instalados.",
-                a11yStatusBadge,
-                "Abrir Acessibilidade",
+        a11yValueView = new TextView(this);
+        permGroup.addView(buildActionRow(
+                d,
+                "Serviço de acessibilidade",
+                a11yValueView,
                 new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
@@ -126,166 +179,169 @@ public class MainActivity extends Activity {
                     }
                 }
         ));
+        root.addView(permGroup);
 
-        // Preferences Card
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        LinearLayout prefsCard = createCardContainer(density);
+        // Section: Comportamento
+        root.addView(buildSectionLabel(d, "COMPORTAMENTO"));
+        LinearLayout optsGroup = createGroupCard(d);
 
-        TextView prefsHeader = new TextView(this);
-        prefsHeader.setText("Preferências");
-        prefsHeader.setTextColor(Color.WHITE);
-        prefsHeader.setTextSize(16f);
-        prefsHeader.setTypeface(Typeface.DEFAULT_BOLD);
-        prefsHeader.setPadding(0, 0, 0, (int) (8 * density));
-        prefsCard.addView(prefsHeader);
+        optsGroup.addView(buildSwitchRow(d, prefs, KEY_ENABLE_SCROLLBAR, true, "Barra na borda direita"));
+        optsGroup.addView(buildDivider(d));
+        optsGroup.addView(buildSwitchRow(d, prefs, KEY_ENABLE_DRAG, true, "Arrastar barra para rolar"));
+        optsGroup.addView(buildDivider(d));
+        optsGroup.addView(buildSwitchRow(d, prefs, KEY_ENABLE_TOP_TAP, true, "Toque no topo sobe a página"));
+        optsGroup.addView(buildDivider(d));
+        optsGroup.addView(buildSwitchRow(d, prefs, KEY_HIDE_IN_BANKS, true, "Pausar em apps de banco"));
 
-        prefsCard.addView(buildToggleRow(
-                density,
-                prefs,
-                KEY_ENABLE_SCROLLBAR,
-                true,
-                "Barra de rolagem na borda direita",
-                "Exibe o indicador estilo iOS em apps que ocultam a barra nativa (como X/Twitter)."
-        ));
+        root.addView(optsGroup);
 
-        prefsCard.addView(buildToggleRow(
-                density,
-                prefs,
-                KEY_ENABLE_DRAG,
-                true,
-                "Arrastar barra para rolar (Scrubbing)",
-                "Segure a barra na lateral direita e deslize para rolar a página com resposta tátil."
-        ));
+        // Section: Área de teste
+        root.addView(buildSectionLabel(d, "ÁREA DE TESTE"));
+        LinearLayout testGroup = createGroupCard(d);
+        for (int i = 1; i <= 36; i++) {
+            if (i > 1) {
+                testGroup.addView(buildDivider(d));
+            }
+            testGroup.addView(buildSampleRow(d, i));
+        }
+        root.addView(testGroup);
 
-        prefsCard.addView(buildToggleRow(
-                density,
-                prefs,
-                KEY_ENABLE_TOP_TAP,
-                true,
-                "Toque no topo para voltar ao início",
-                "Toque na região da câmera frontal / barra de status para subir ao topo da lista."
-        ));
-
-        prefsCard.addView(buildToggleRow(
-                density,
-                prefs,
-                KEY_HIDE_IN_BANKS,
-                true,
-                "Pausar em apps de banco",
-                "Desativa a sobreposição automaticamente em aplicativos bancários e corretoras."
-        ));
-
-        root.addView(prefsCard);
         setContentView(scrollView);
+        refreshPermissionLabels();
     }
 
-    private LinearLayout createCardContainer(float density) {
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        int pad = (int) (16 * density);
-        card.setPadding(pad, pad, pad, pad);
+    private View buildThemeSwitcher(float d, final SharedPreferences prefs) {
+        LinearLayout bar = new LinearLayout(this);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        int pad = (int) (3 * d);
+        bar.setPadding(pad, pad, pad, pad);
 
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(Color.parseColor("#161A23"));
-        bg.setCornerRadius(14 * density);
-        bg.setStroke((int) (1 * density), Color.parseColor("#262C3A"));
+        bg.setColor(surfaceColor);
+        bg.setCornerRadius(8 * d);
+        bg.setStroke((int) Math.max(1, d), borderColor);
+        bar.setBackground(bg);
+
+        String[] labels = {"Auto", "Escuro", "Claro"};
+        int current = prefs.getInt(KEY_THEME_MODE, 0);
+
+        for (int i = 0; i < labels.length; i++) {
+            final int modeIndex = i;
+            TextView chip = new TextView(this);
+            chip.setText(labels[i]);
+            chip.setTextSize(12f);
+            int hPad = (int) (10 * d);
+            int vPad = (int) (5 * d);
+            chip.setPadding(hPad, vPad, hPad, vPad);
+
+            if (i == current) {
+                chip.setTextColor(pillSelectedText);
+                chip.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+                GradientDrawable chipBg = new GradientDrawable();
+                chipBg.setColor(pillSelectedBg);
+                chipBg.setCornerRadius(6 * d);
+                chip.setBackground(chipBg);
+            } else {
+                chip.setTextColor(textSecondary);
+            }
+
+            chip.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    prefs.edit().putInt(KEY_THEME_MODE, modeIndex).apply();
+                    rebuildUi();
+                }
+            });
+            bar.addView(chip);
+        }
+        return bar;
+    }
+
+    private TextView buildSectionLabel(float d, String text) {
+        TextView tv = new TextView(this);
+        tv.setText(text);
+        tv.setTextColor(textSecondary);
+        tv.setTextSize(11.5f);
+        tv.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        tv.setLetterSpacing(0.06f);
+        tv.setPadding((int) (4 * d), (int) (14 * d), 0, (int) (6 * d));
+        return tv;
+    }
+
+    private LinearLayout createGroupCard(float d) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(surfaceColor);
+        bg.setCornerRadius(12 * d);
+        bg.setStroke((int) Math.max(1, d), borderColor);
         card.setBackground(bg);
 
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
         );
-        lp.bottomMargin = (int) (14 * density);
+        lp.bottomMargin = (int) (6 * d);
         card.setLayoutParams(lp);
         return card;
     }
 
-    private View buildStepCard(
-            float density,
-            String titleText,
-            String bodyText,
-            TextView badgeView,
-            String buttonLabel,
-            View.OnClickListener onClick
-    ) {
-        LinearLayout card = createCardContainer(density);
-
-        LinearLayout headerRow = new LinearLayout(this);
-        headerRow.setOrientation(LinearLayout.HORIZONTAL);
-        headerRow.setGravity(Gravity.CENTER_VERTICAL);
-
-        TextView title = new TextView(this);
-        title.setText(titleText);
-        title.setTextColor(Color.WHITE);
-        title.setTextSize(15.5f);
-        title.setTypeface(Typeface.DEFAULT_BOLD);
-        LinearLayout.LayoutParams titleLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-        headerRow.addView(title, titleLp);
-
-        if (badgeView != null) {
-            badgeView.setTextSize(12f);
-            badgeView.setTypeface(Typeface.DEFAULT_BOLD);
-            int hPad = (int) (10 * density);
-            int vPad = (int) (4 * density);
-            badgeView.setPadding(hPad, vPad, hPad, vPad);
-            headerRow.addView(badgeView);
-        }
-
-        card.addView(headerRow);
-
-        TextView desc = new TextView(this);
-        desc.setText(bodyText);
-        desc.setTextColor(Color.parseColor("#94A3B8"));
-        desc.setTextSize(13.5f);
-        desc.setPadding(0, (int) (8 * density), 0, (int) (12 * density));
-        card.addView(desc);
-
-        Button btn = new Button(this);
-        btn.setText(buttonLabel);
-        btn.setAllCaps(false);
-        btn.setTextColor(Color.WHITE);
-        btn.setTextSize(14f);
-        GradientDrawable btnBg = new GradientDrawable();
-        btnBg.setColor(Color.parseColor("#2563EB"));
-        btnBg.setCornerRadius(10 * density);
-        btn.setBackground(btnBg);
-        btn.setOnClickListener(onClick);
-        card.addView(btn);
-
-        return card;
+    private View buildDivider(float d) {
+        View v = new View(this);
+        v.setBackgroundColor(borderColor);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                Math.max(1, (int) d)
+        );
+        lp.leftMargin = (int) (16 * d);
+        v.setLayoutParams(lp);
+        return v;
     }
 
-    private View buildToggleRow(
-            float density,
+    private View buildActionRow(float d, String label, TextView rightView, View.OnClickListener onClick) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        int hPad = (int) (16 * d);
+        int vPad = (int) (14 * d);
+        row.setPadding(hPad, vPad, hPad, vPad);
+        row.setOnClickListener(onClick);
+
+        TextView left = new TextView(this);
+        left.setText(label);
+        left.setTextColor(textPrimary);
+        left.setTextSize(15f);
+        LinearLayout.LayoutParams leftLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        row.addView(left, leftLp);
+
+        rightView.setTextColor(textSecondary);
+        rightView.setTextSize(14f);
+        row.addView(rightView);
+
+        return row;
+    }
+
+    private View buildSwitchRow(
+            float d,
             final SharedPreferences prefs,
             final String key,
             boolean defaultVal,
-            String titleText,
-            String subtitleText
+            String label
     ) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(0, (int) (10 * density), 0, (int) (10 * density));
+        int hPad = (int) (16 * d);
+        int vPad = (int) (11 * d);
+        row.setPadding(hPad, vPad, hPad, vPad);
 
-        LinearLayout textCol = new LinearLayout(this);
-        textCol.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout.LayoutParams colLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-        colLp.rightMargin = (int) (12 * density);
-
-        TextView t = new TextView(this);
-        t.setText(titleText);
-        t.setTextColor(Color.parseColor("#F1F5F9"));
-        t.setTextSize(14.5f);
-        textCol.addView(t);
-
-        TextView sub = new TextView(this);
-        sub.setText(subtitleText);
-        sub.setTextColor(Color.parseColor("#64748B"));
-        sub.setTextSize(12.5f);
-        textCol.addView(sub);
-
-        row.addView(textCol, colLp);
+        TextView left = new TextView(this);
+        left.setText(label);
+        left.setTextColor(textPrimary);
+        left.setTextSize(15f);
+        LinearLayout.LayoutParams leftLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        row.addView(left, leftLp);
 
         Switch sw = new Switch(this);
         sw.setChecked(prefs.getBoolean(key, defaultVal));
@@ -300,46 +356,46 @@ public class MainActivity extends Activity {
         return row;
     }
 
-    private void styleBadge(TextView badge, boolean ok, String okText, String pendingText) {
-        float density = getResources().getDisplayMetrics().density;
-        GradientDrawable bg = new GradientDrawable();
-        bg.setCornerRadius(999 * density);
-        if (ok) {
-            badge.setText(okText);
-            badge.setTextColor(Color.parseColor("#4ADE80"));
-            bg.setColor(Color.parseColor("#14532D"));
-        } else {
-            badge.setText(pendingText);
-            badge.setTextColor(Color.parseColor("#F87171"));
-            bg.setColor(Color.parseColor("#450A0A"));
-        }
-        badge.setBackground(bg);
+    private View buildSampleRow(float d, int index) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        int hPad = (int) (16 * d);
+        int vPad = (int) (14 * d);
+        row.setPadding(hPad, vPad, hPad, vPad);
+
+        TextView left = new TextView(this);
+        left.setText("Linha de demonstração " + (index < 10 ? "0" + index : String.valueOf(index)));
+        left.setTextColor(textPrimary);
+        left.setTextSize(14.5f);
+        LinearLayout.LayoutParams leftLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        row.addView(left, leftLp);
+
+        TextView right = new TextView(this);
+        right.setText("#" + (index < 10 ? "0" + index : String.valueOf(index)));
+        right.setTextColor(textSecondary);
+        right.setTextSize(13f);
+        row.addView(right);
+
+        return row;
+    }
+
+    private void refreshPermissionLabels() {
+        if (overlayValueView == null || a11yValueView == null) return;
+        boolean hasOverlay = Settings.canDrawOverlays(this);
+        String enabled = Settings.Secure.getString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
+        boolean hasA11y = enabled != null && enabled.contains(getPackageName());
+
+        overlayValueView.setText(hasOverlay ? "Ativa" : "Permitir ›");
+        overlayValueView.setTextColor(hasOverlay ? textPrimary : textSecondary);
+
+        a11yValueView.setText(hasA11y ? "Ativo" : "Ativar ›");
+        a11yValueView.setTextColor(hasA11y ? textPrimary : textSecondary);
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        float density = getResources().getDisplayMetrics().density;
-        boolean hasOverlay = Settings.canDrawOverlays(this);
-        String enabled = Settings.Secure.getString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
-        boolean hasA11y = enabled != null && enabled.contains(getPackageName());
-
-        styleBadge(overlayStatusBadge, hasOverlay, "Concedida", "Pendente");
-        styleBadge(a11yStatusBadge, hasA11y, "Ativo", "Inativo");
-
-        GradientDrawable bannerBg = new GradientDrawable();
-        bannerBg.setCornerRadius(12 * density);
-        if (hasOverlay && hasA11y) {
-            overallBanner.setText("Tudo pronto. A barra lateral estilo iOS e o toque no topo estão ativos.");
-            overallBanner.setTextColor(Color.parseColor("#4ADE80"));
-            bannerBg.setColor(Color.parseColor("#052E16"));
-            bannerBg.setStroke((int) (1 * density), Color.parseColor("#166534"));
-        } else {
-            overallBanner.setText("Conclua os passos pendentes abaixo para ativar a barra de rolagem.");
-            overallBanner.setTextColor(Color.parseColor("#FBBF24"));
-            bannerBg.setColor(Color.parseColor("#422006"));
-            bannerBg.setStroke((int) (1 * density), Color.parseColor("#854D0E"));
-        }
-        overallBanner.setBackground(bannerBg);
+        refreshPermissionLabels();
     }
 }
