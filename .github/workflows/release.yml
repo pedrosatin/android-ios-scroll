@@ -25,5 +25,5 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: s25-scroll-helper-apk
-          path: s25-scroll-helper.apk
+          name: scroll-helper-apk
+          path: scroll-helper.apk

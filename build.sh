@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SDK_DIR="$ROOT_DIR/.sdk"
 BUILD_DIR="$ROOT_DIR/build"
-OUT_APK="$ROOT_DIR/s25-scroll-helper.apk"
+OUT_APK="$ROOT_DIR/scroll-helper.apk"
 KEYSTORE="$ROOT_DIR/debug.keystore"
 
 mkdir -p "$SDK_DIR" "$BUILD_DIR/gen" "$BUILD_DIR/classes"

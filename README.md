@@ -1,32 +1,34 @@
 # Scroll Helper
 
-Barra de rolagem estilo iOS na borda direita e toque no topo da tela para voltar ao início no Android e na One UI.
+iOS-style right-edge scrollbar and status-bar tap-to-scroll-to-top for Android 10+ (`minSdkVersion 29`, `~25 KB`, zero dependencies).
 
-![Demonstração do Scroll Helper](assets/demo.gif)
+Works on any Android phone (Samsung One UI, Pixel, Xiaomi, Motorola, Nothing). Tested at 120Hz on a Galaxy S25 running Android 17 / One UI 9.
 
-## O que faz
+![Scroll Helper demo](assets/demo.gif)
 
-- Desenha uma barra lateral discreta a 120Hz em aplicativos que escondem o indicador nativo, como o feed do X (Twitter).
-- Permite segurar e arrastar a barra lateral para rolar a página com resposta tátil e velocidade contínua.
-- Volta ao topo da lista ao tocar na área central da barra de status (câmera frontal), mantendo o gesto de deslizar para baixo para abrir as notificações.
-- Alterna entre tema escuro, claro ou automático e pausa sozinho em aplicativos de banco.
+## Features
 
-## Instalação
+- Renders a 120Hz right-edge scrollbar in apps that hide the native indicator, including X (Twitter) and Jetpack Compose feeds.
+- Expands the scrollbar pill on long-press with haptic feedback so you can drag it vertically to scrub through long lists.
+- Scrolls back to the top of any feed or browser when you tap the center of the status bar (camera cutout), while keeping swipe-down for notifications.
+- Supports Auto, Dark, and Light themes and pauses automatically inside banking apps.
 
-### Pelo celular (APK direto ou Obtainium)
+## Installation
 
-1. Baixe o `s25-scroll-helper.apk` na [última release](https://github.com/pedrosatin/android-ios-scroll/releases/latest) ou adicione `https://github.com/pedrosatin/android-ios-scroll` no Obtainium.
-2. Abra o **Scroll Helper** e ative a **Sobreposição de tela**.
-3. No Android 13+, toque em **Configurações restritas**, abra o menu `⋮` no canto superior direito e marque **Permitir configurações restritas**.
-4. Toque em **Serviço de acessibilidade** e ative o **Scroll Helper**.
+### On device (direct APK or Obtainium)
 
-### Via ADB (recomendado para apps de banco)
+1. Download `scroll-helper.apk` from [Releases](https://github.com/pedrosatin/android-ios-scroll/releases/latest) or add `https://github.com/pedrosatin/android-ios-scroll` to Obtainium.
+2. Open **Scroll Helper** and grant **Display over other apps**.
+3. On Android 13+, tap **Allow restricted settings**, open the top-right `⋮` menu on the App Info screen, and select **Allow restricted settings**.
+4. Tap **Accessibility service** and enable **Scroll Helper**.
 
-Instalar com `-i com.android.vending` registra a Play Store como origem do pacote e evita alertas de segurança em bancos como Nubank e Inter:
+### Via ADB (recommended if you use banking apps)
+
+Installing with `-i com.android.vending` sets Google Play Store as the installer source so banking apps do not flag the accessibility service as sideloaded:
 
 ```bash
-curl -sL https://github.com/pedrosatin/android-ios-scroll/releases/latest/download/s25-scroll-helper.apk -o s25-scroll-helper.apk && \
-adb install -r -g -i com.android.vending s25-scroll-helper.apk && \
+curl -sL https://github.com/pedrosatin/android-ios-scroll/releases/latest/download/scroll-helper.apk -o scroll-helper.apk && \
+adb install -r -g -i com.android.vending scroll-helper.apk && \
 adb shell appops set dev.satin.scrollhelper SYSTEM_ALERT_WINDOW allow && \
 EXISTING_A11Y=$(adb shell settings get secure enabled_accessibility_services | tr -d '\r') && \
 if [ "$EXISTING_A11Y" = "null" ] || [ -z "$EXISTING_A11Y" ]; then \
@@ -37,27 +39,17 @@ fi && \
 adb shell settings put secure accessibility_enabled 1
 ```
 
-## Como funciona no X (Twitter) e Jetpack Compose
+## How it fixes Jetpack Compose scrollbars
 
-Listas em Jetpack Compose emitem eventos `TYPE_VIEW_SCROLLED` com `fromIndex = -1`, `itemCount = -1` e `maxScrollY = scrollY + 100`. Dividir `scrollY / maxScrollY` trava qualquer barra comum em 99%.
+Jetpack Compose lazy lists (such as the X/Twitter timeline) emit `TYPE_VIEW_SCROLLED` with `fromIndex = -1`, `itemCount = -1`, and a synthetic `maxScrollY` fixed at `scrollY + 100`. Dividing `scrollY / maxScrollY` pins standard scrollbar overlays at 99%.
 
-O [`ScrollAccessibilityService.java`](src/dev/satin/scrollhelper/ScrollAccessibilityService.java) identifica essa margem sintética fixa, acompanha o maior `scrollY` da sessão e calcula a posição com interpolação exponencial no `Choreographer.FrameCallback`. No arrasto manual da barra, a velocidade do dedo é convertida em gestos contínuos (`GestureDescription`) em vez de saltos de página via `ACTION_SCROLL_FORWARD`.
+[`ScrollAccessibilityService.java`](src/dev/satin/scrollhelper/ScrollAccessibilityService.java) detects that constant `50..250 px` gap, tracks the highest `scrollY` seen in the session, and interpolates thumb position inside `Choreographer.FrameCallback` using exponential decay. When dragging the thumb, finger velocity is converted into continuous `GestureDescription` strokes instead of discrete `ACTION_SCROLL_FORWARD` page jumps.
 
-## Build
+## Build from source
 
 ```bash
 ./build.sh
 ```
-
----
-
-## English
-
-Right-edge iOS-style scrollbar (120Hz, hold-and-drag thumb scrubbing) and status-bar tap-to-scroll-to-top for Android and Samsung One UI.
-
-- Works on Jetpack Compose feeds like X (Twitter) where `maxScrollY` is fixed at `scrollY + 100`.
-- Supports system, dark, and light themes (`~26 KB` APK, zero dependencies, Android 10+).
-- Pauses automatically inside banking apps. Download from [Releases](https://github.com/pedrosatin/android-ios-scroll/releases/latest) or install with the ADB command above.
 
 ## License
 

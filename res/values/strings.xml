@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">S25 Scroll Helper</string>
-    <string name="service_desc">Barra de rolagem na borda direita e toque no topo para voltar ao início (estilo iOS).</string>
+    <string name="app_name">Scroll Helper</string>
+    <string name="service_desc">iOS-style right-edge scrollbar and status-bar tap-to-scroll-to-top for Android.</string>
 </resources>

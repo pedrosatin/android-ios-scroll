@@ -26,7 +26,7 @@ public class MainActivity extends Activity {
     public static final String KEY_ENABLE_DRAG = "enable_drag_scrub";
     public static final String KEY_ENABLE_TOP_TAP = "enable_top_tap";
     public static final String KEY_HIDE_IN_BANKS = "hide_in_banks";
-    public static final String KEY_THEME_MODE = "theme_mode"; // 0 = system, 1 = dark, 2 = light
+    public static final String KEY_THEME_MODE = "theme_mode"; // 0 = auto, 1 = dark, 2 = light
 
     private TextView overlayValueView;
     private TextView a11yValueView;
@@ -36,7 +36,6 @@ public class MainActivity extends Activity {
     private int borderColor;
     private int textPrimary;
     private int textSecondary;
-    private int pillBg;
     private int pillSelectedBg;
     private int pillSelectedText;
 
@@ -58,6 +57,7 @@ public class MainActivity extends Activity {
         return uiMode == Configuration.UI_MODE_NIGHT_YES;
     }
 
+    @SuppressWarnings("deprecation")
     private void applyPalette(boolean isDark) {
         if (isDark) {
             bgColor = Color.parseColor("#0A0A0A");
@@ -65,7 +65,6 @@ public class MainActivity extends Activity {
             borderColor = Color.parseColor("#262626");
             textPrimary = Color.parseColor("#EDEDED");
             textSecondary = Color.parseColor("#8A8A8E");
-            pillBg = Color.parseColor("#222224");
             pillSelectedBg = Color.parseColor("#EDEDED");
             pillSelectedText = Color.parseColor("#0A0A0A");
         } else {
@@ -74,7 +73,6 @@ public class MainActivity extends Activity {
             borderColor = Color.parseColor("#E4E4E7");
             textPrimary = Color.parseColor("#18181B");
             textSecondary = Color.parseColor("#71717A");
-            pillBg = Color.parseColor("#F4F4F5");
             pillSelectedBg = Color.parseColor("#18181B");
             pillSelectedText = Color.parseColor("#FFFFFF");
         }
@@ -128,14 +126,14 @@ public class MainActivity extends Activity {
         topBar.addView(buildThemeSwitcher(d, prefs));
         root.addView(topBar);
 
-        // Section: Permissões
-        root.addView(buildSectionLabel(d, "PERMISSÕES"));
+        // Section: Permissions
+        root.addView(buildSectionLabel(d, "PERMISSIONS"));
         LinearLayout permGroup = createGroupCard(d);
 
         overlayValueView = new TextView(this);
         permGroup.addView(buildActionRow(
                 d,
-                "Sobreposição de tela",
+                "Display over other apps",
                 overlayValueView,
                 new View.OnClickListener() {
                     @Override
@@ -150,10 +148,10 @@ public class MainActivity extends Activity {
         permGroup.addView(buildDivider(d));
 
         TextView restrictedValue = new TextView(this);
-        restrictedValue.setText("Info do app ›");
+        restrictedValue.setText("App info ›");
         permGroup.addView(buildActionRow(
                 d,
-                "Configurações restritas",
+                "Allow restricted settings",
                 restrictedValue,
                 new View.OnClickListener() {
                     @Override
@@ -170,7 +168,7 @@ public class MainActivity extends Activity {
         a11yValueView = new TextView(this);
         permGroup.addView(buildActionRow(
                 d,
-                "Serviço de acessibilidade",
+                "Accessibility service",
                 a11yValueView,
                 new View.OnClickListener() {
                     @Override
@@ -181,22 +179,22 @@ public class MainActivity extends Activity {
         ));
         root.addView(permGroup);
 
-        // Section: Comportamento
-        root.addView(buildSectionLabel(d, "COMPORTAMENTO"));
+        // Section: Behavior
+        root.addView(buildSectionLabel(d, "BEHAVIOR"));
         LinearLayout optsGroup = createGroupCard(d);
 
-        optsGroup.addView(buildSwitchRow(d, prefs, KEY_ENABLE_SCROLLBAR, true, "Barra na borda direita"));
+        optsGroup.addView(buildSwitchRow(d, prefs, KEY_ENABLE_SCROLLBAR, true, "Right-edge scrollbar"));
         optsGroup.addView(buildDivider(d));
-        optsGroup.addView(buildSwitchRow(d, prefs, KEY_ENABLE_DRAG, true, "Arrastar barra para rolar"));
+        optsGroup.addView(buildSwitchRow(d, prefs, KEY_ENABLE_DRAG, true, "Hold and drag scrollbar"));
         optsGroup.addView(buildDivider(d));
-        optsGroup.addView(buildSwitchRow(d, prefs, KEY_ENABLE_TOP_TAP, true, "Toque no topo sobe a página"));
+        optsGroup.addView(buildSwitchRow(d, prefs, KEY_ENABLE_TOP_TAP, true, "Tap status bar to scroll top"));
         optsGroup.addView(buildDivider(d));
-        optsGroup.addView(buildSwitchRow(d, prefs, KEY_HIDE_IN_BANKS, true, "Pausar em apps de banco"));
+        optsGroup.addView(buildSwitchRow(d, prefs, KEY_HIDE_IN_BANKS, true, "Pause in banking apps"));
 
         root.addView(optsGroup);
 
-        // Section: Área de teste
-        root.addView(buildSectionLabel(d, "ÁREA DE TESTE"));
+        // Section: Playground
+        root.addView(buildSectionLabel(d, "PLAYGROUND"));
         LinearLayout testGroup = createGroupCard(d);
         for (int i = 1; i <= 36; i++) {
             if (i > 1) {
@@ -222,7 +220,7 @@ public class MainActivity extends Activity {
         bg.setStroke((int) Math.max(1, d), borderColor);
         bar.setBackground(bg);
 
-        String[] labels = {"Auto", "Escuro", "Claro"};
+        String[] labels = {"Auto", "Dark", "Light"};
         int current = prefs.getInt(KEY_THEME_MODE, 0);
 
         for (int i = 0; i < labels.length; i++) {
@@ -365,7 +363,7 @@ public class MainActivity extends Activity {
         row.setPadding(hPad, vPad, hPad, vPad);
 
         TextView left = new TextView(this);
-        left.setText("Linha de demonstração " + (index < 10 ? "0" + index : String.valueOf(index)));
+        left.setText("Sample item " + (index < 10 ? "0" + index : String.valueOf(index)));
         left.setTextColor(textPrimary);
         left.setTextSize(14.5f);
         LinearLayout.LayoutParams leftLp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
@@ -386,10 +384,10 @@ public class MainActivity extends Activity {
         String enabled = Settings.Secure.getString(getContentResolver(), Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES);
         boolean hasA11y = enabled != null && enabled.contains(getPackageName());
 
-        overlayValueView.setText(hasOverlay ? "Ativa" : "Permitir ›");
+        overlayValueView.setText(hasOverlay ? "Granted" : "Grant ›");
         overlayValueView.setTextColor(hasOverlay ? textPrimary : textSecondary);
 
-        a11yValueView.setText(hasA11y ? "Ativo" : "Ativar ›");
+        a11yValueView.setText(hasA11y ? "Active" : "Enable ›");
         a11yValueView.setTextColor(hasA11y ? textPrimary : textSecondary);
     }
 
