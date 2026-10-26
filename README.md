@@ -1,6 +1,6 @@
 # Scroll Helper
 
-iOS-style right-edge scrollbar and status-bar tap-to-scroll-to-top for Android 10+ (`minSdkVersion 29`, `~26 KB`, zero dependencies).
+iOS-style right-edge scrollbar and status-bar tap-to-scroll-to-top for Android 10+ (`minSdkVersion 29`, `~33 KB`, zero dependencies).
 
 Works on any Android phone (Samsung One UI, Pixel, Xiaomi, Motorola, Nothing). Tested at 120Hz on a Galaxy S25 running Android 17 / One UI 9.
 
@@ -44,7 +44,13 @@ adb shell settings put secure accessibility_enabled 1
 
 Jetpack Compose lazy lists (such as the X/Twitter timeline) emit `TYPE_VIEW_SCROLLED` with `fromIndex = -1`, `itemCount = -1`, and a synthetic `maxScrollY` fixed at `scrollY + 100`. Dividing `scrollY / maxScrollY` pins standard scrollbar overlays at 99%.
 
-[`ScrollAccessibilityService.java`](src/dev/satin/scrollhelper/ScrollAccessibilityService.java) detects that constant `50..250 px` gap, tracks the highest `scrollY` seen in the session, and interpolates thumb position inside `Choreographer.FrameCallback` using exponential decay. When dragging the thumb, finger velocity is converted into continuous `GestureDescription` strokes instead of discrete `ACTION_SCROLL_FORWARD` page jumps.
+[`ScrollAccessibilityService.java`](src/dev/satin/scrollhelper/ScrollAccessibilityService.java) detects that constant `50..250 px` gap. Compose derives `scrollY` from the first visible item, so it jumps by hundreds of pixels for a single event whenever an item leaves the screen. The service advances by the median of the last three deltas, which drops those spikes, and drifts back toward the reported value only in the direction of motion. The unknown feed length is mapped with `pos / (pos + 10 screens)`: the thumb moves about a tenth of the track per screen at the top and slows gradually deeper in the feed. The mapping depends only on the position, so the thumb never jumps.
+
+Accessibility scroll events arrive about every 100 ms. The thumb is drawn 120 ms behind real time and interpolated between the two surrounding events inside `Choreographer.FrameCallback`, so it moves on every frame at 120 Hz without overshooting. Because that interpolation is linear between events, its velocity steps at each event; a centred Gaussian average over ±64 ms of the trajectory (already known thanks to the render delay) smooths those steps at the end of a fling. A lone scroll event (an app re-measuring after loading content) does not show the bar; a real scroll sends a second event within 250 ms. Thickness (4 dp), color (36% white or black), and fade (250 ms linear, after the bar has been still for 1 s) follow the native Android scrollbar. Only a small window around the thumb accepts touches, so taps next to it still reach the app. Dragging the thumb maps its travel to pages of the list (at most 15 across the whole track in infinite feeds) and sends them as `ACTION_SCROLL_FORWARD`/`ACTION_SCROLL_BACKWARD`, one at a time once the previous page stops moving. An injected gesture would cancel the finger holding the thumb. Pages that have not been sent when the finger lifts are dropped, so the list stops with the finger.
+
+## Battery and performance notes
+
+The service only does work when something scrolls or the thumb is being dragged. The frame loop stops as soon as the thumb settles and fades out; there is no polling, no logging, and no work while the screen is idle. Display metrics, theme, and the per-app exclusion list are cached and refreshed only when preferences or the device configuration change, so the per-event and per-frame paths avoid re-querying resources and preferences.
 
 ## Build from source
 
