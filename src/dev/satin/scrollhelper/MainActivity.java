@@ -198,6 +198,13 @@ public class MainActivity extends Activity {
         optsGroup.addView(buildSwitchRow(d, prefs, KEY_ENABLE_TOP_TAP, true, "Tap status bar to scroll top"));
         optsGroup.addView(buildDivider(d));
         optsGroup.addView(buildSwitchRow(d, prefs, KEY_HIDE_IN_BANKS, true, "Pause in banking apps"));
+        optsGroup.addView(buildDivider(d));
+        TextView a11yNote = new TextView(this);
+        a11yNote.setText("This app has no notification of its own. Any Accessibility tile in the shade is from the system while the service is on — turn the service off above to remove it.");
+        a11yNote.setTextColor(textSecondary);
+        a11yNote.setTextSize(12f);
+        a11yNote.setPadding((int) (16 * d), (int) (12 * d), (int) (16 * d), (int) (12 * d));
+        optsGroup.addView(a11yNote);
 
         recentAppContainer = new LinearLayout(this);
         recentAppContainer.setOrientation(LinearLayout.VERTICAL);
