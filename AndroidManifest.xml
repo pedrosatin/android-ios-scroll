@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="dev.satin.scrollhelper"
-    android:versionCode="7"
-    android:versionName="1.6.0">
+    android:versionCode="8"
+    android:versionName="1.6.1">
 
     <uses-sdk android:minSdkVersion="29" android:targetSdkVersion="34" />
 
@@ -10,11 +10,14 @@
 
     <application
         android:label="Scroll Helper"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:allowBackup="false">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:icon="@mipmap/ic_launcher"
             android:configChanges="uiMode|orientation|screenSize"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
             <intent-filter>
@@ -26,6 +29,7 @@
         <service
             android:name=".ScrollAccessibilityService"
             android:label="Scroll Helper"
+            android:icon="@mipmap/ic_launcher"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
             android:exported="false">
             <intent-filter>
